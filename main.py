@@ -5,29 +5,43 @@ import os
 
 os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 
-def extract_pose_data(self, results):
-        if not results.pose_landmarks:
-            return None
+csv_data = []
 
-        landmarks = []
-        for landmark in results.pose_landmarks.landmark:
-            landmarks.extend([landmark.x, landmark.y, landmark.z])
+def extract_pose_data(results):
+    if not results.pose_landmarks:
+        return None
 
-        return np.array(landmarks)
+    landmarks = []
+    for landmark in results.pose_landmarks.landmark:
+        landmarks.extend([landmark.x, landmark.y, landmark.z])
+
+    
+
+    return np.array(landmarks)
 
 def classify():
+    print("Opening camera...")
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    
+    
+    if not cap.isOpened():
+        print("Error: Could not open camera")
+        return
 
-    cap = cv2.VideoCapture(0)
+    print("Camera opened successfully")
 
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
+    
+    print("Initializing MediaPipe Pose...")
     pose = mp_pose.Pose()
+    print("MediaPipe Pose initialized")
 
     while True:
-        
         ret, frame = cap.read()
         
         if not ret:
+            print("Error: Could not read frame")
             break
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -37,13 +51,17 @@ def classify():
             mp_drawing.draw_landmarks(
                 frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
             )
-
             landmarks = extract_pose_data(results)
 
         cv2.imshow("frame", frame)
 
-        if cv2.waitKey(1) == ord('q'):
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
 
+    pose.close()  # Properly close MediaPipe
     cap.release()
     cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    classify()
