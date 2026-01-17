@@ -22,67 +22,67 @@ DEBUG_AI = os.getenv("DEBUG_AI", "").lower() == "true"  # Set DEBUG_AI=true to s
 # --- Step 1: Stretch database ---
 stretches = [
     {
-        "name": "Cat-Cow",
-        "target": "Back",
-        "duration": 60,
-        "instructions": "Get on hands and knees. Alternate between:\n  COW: Drop hips, lift head and chest up, arch your back\n  CAT: Hunch shoulders up, drop head, round your back\n  Repeat smoothly, syncing with breathing",
+        "name": "Arm Crossover Stretch",
+        "target": "Shoulders",
+        "duration": 30,
+        "instructions": "Sit upright in chair. Bring one arm across your body at shoulder height.\n  Use opposite arm to gently pull it closer to your chest.\n  Keep shoulders relaxed. Hold and breathe.\n  Alternate sides.",
     },
     {
-        "name": "Child's Pose",
-        "target": "Back",
-        "duration": 60,
-        "instructions": "Kneel, then sit hips back to heels with forehead touching ground.\n  Arms can be extended forward or relaxed by your sides.\n  Keep your back rounded and shoulders relaxed.",
+        "name": "Wrist Rotations",
+        "target": "Wrists/Forearms",
+        "reps": 20,
+        "instructions": "Sit upright. Extend arms forward with palms down.\n  Rotate wrists in circles - 10 rotations clockwise, 10 counter-clockwise.\n  Keep movements smooth and controlled.\n  Repeat on both hands.",
     },
     {
-        "name": "Spinal Twist",
-        "target": "Back",
-        "duration": 60,
-        "instructions": "Sit with legs extended. Bend one knee and cross it over other leg.\n  Twist torso toward the bent knee, hugging it to your chest.\n  Keep your back straight and twist from the spine.\n  Alternate sides.",
+        "name": "Reach Behind the Back",
+        "target": "Chest/Shoulders",
+        "duration": 30,
+        "instructions": "Sit upright in chair. Clasp hands behind your back at lower back level.\n  Straighten arms and gently push chest forward.\n  Feel the stretch across chest and shoulders.\n  Breathe deeply and hold.",
+    },
+    {
+        "name": "Neck Tilts",
+        "target": "Neck",
+        "reps": 16,
+        "instructions": "Sit upright. Slowly tilt head toward one shoulder.\n  Hold for 2 seconds, then return to center.\n  Tilt toward opposite shoulder. Hold for 2 seconds.\n  Repeat alternating sides 8 times each.",
+    },
+    {
+        "name": "Side Bends",
+        "target": "Torso/Obliques",
+        "reps": 16,
+        "instructions": "Sit upright with feet flat. Raise one arm overhead.\n  Gently bend torso toward the opposite side.\n  Keep hips in place, bend only at the waist.\n  Alternate sides, 8 times each direction.",
     },
     {
         "name": "Chest Opener",
-        "target": "Chest/Shoulders",
-        "duration": 60,
-        "instructions": "Stand upright with feet shoulder-width apart.\n  Pull both arms back behind you, keeping elbows bent.\n  Squeeze shoulder blades together, open your chest.\n  Keep shoulders level and arms extended back.",
+        "target": "Chest",
+        "duration": 30,
+        "instructions": "Sit upright in chair. Clasp hands behind head, elbows pointing out.\n  Gently squeeze shoulder blades together, opening chest.\n  Keep elbows back and shoulders relaxed.\n  Breathe deeply and hold.",
+    },
+    {
+        "name": "Spinal Twist",
+        "target": "Torso/Back",
+        "duration": 30,
+        "instructions": "Sit upright in chair. Cross arms over chest or place opposite hand to knee.\n  Rotate torso toward one side, keeping hips forward.\n  Feel the twist through entire spine.\n  Hold and breathe, then alternate sides.",
     },
     {
         "name": "Shoulder Rolls",
         "target": "Shoulders",
         "reps": 20,
-        "instructions": "Stand upright. Raise shoulders up toward ears, then roll back.\n  Roll in smooth circles, then reverse direction.\n  Keep arms relaxed at sides.\n  Complete 20 rolls total.",
+        "instructions": "Sit upright with arms relaxed at sides.\n  Roll shoulders backward in smooth circles - 10 rotations.\n  Then roll forward - 10 rotations.\n  Keep movements controlled and fluid.",
     },
     {
-        "name": "Neck Side Stretch",
-        "target": "Neck/Shoulders",
-        "duration": 15,
-        "instructions": "Sit or stand upright. Tilt head toward one shoulder.\n  Gently bring ear closer to shoulder (don't force it).\n  Alternate sides, one side at a time.",
-    },
-    {
-        "name": "Hamstring Stretch",
-        "target": "Legs",
-        "duration": 60,
-        "instructions": "Stand on one leg. Lift the other leg and hold it with hands.\n  Keep leg straight and bend forward at hips slightly.\n  Feel the stretch in the back of your leg.\n  Alternate legs.",
-    },
-    {
-        "name": "Dynamic Lunges",
-        "target": "Legs/Hips",
-        "reps": 16,
-        "instructions": "Step forward with one leg, bending both knees to 90 degrees.\n  Back knee should almost touch ground, front knee over ankle.\n  Push through front heel to return to start.\n  Alternate legs in a walking motion.\n  Complete 16 lunges (8 per leg).",
-    },
-    {
-        "name": "Shoulder Shrugs",
-        "target": "Shoulders",
-        "reps": 15,
-        "instructions": "Stand with arms at sides. Raise shoulders up toward ears.\n  Hold briefly, then release back down.\n  Repeat in a controlled, rhythmic motion.\n  Complete 15 shrugs.",
+        "name": "Neck Rolls",
+        "target": "Neck",
+        "reps": 12,
+        "instructions": "Sit upright. Slowly drop chin to chest.\n  Roll head to one side, then toward back.\n  Continue to opposite side, then back to center.\n  Complete 6 full rotations, then reverse direction 6 times.",
     },
 ]
 
 # --- Step 2: Goal to stretches mapping ---
 goal_to_stretches = {
-    "Back Pain": ["Cat-Cow", "Spinal Twist", "Child's Pose"],
-    "Posture": ["Chest Opener", "Shoulder Rolls"],
-    "Flexibility": ["Hamstring Stretch", "Dynamic Lunges"],
-    "Desk Break": ["Neck Side Stretch", "Shoulder Shrugs"],
+    "Back Pain": ["Spinal Twist", "Side Bends", "Chest Opener"],
+    "Posture": ["Chest Opener", "Reach Behind the Back", "Shoulder Rolls"],
+    "Flexibility": ["Arm Crossover Stretch", "Side Bends", "Neck Rolls"],
+    "Desk Break": ["Neck Tilts", "Shoulder Rolls", "Wrist Rotations"],
 }
 
 
@@ -450,12 +450,12 @@ def verify_shoulder_rolls(landmarks):
     if any(x is None for x in [l_shoulder, r_shoulder, l_ear, r_ear]):
         return False
     
-    # Shoulders should be elevated (close to ears)
+    # Shoulders should be elevated (close to ears) - more lenient for reps
     l_dist = abs(l_shoulder[1] - l_ear[1])
     r_dist = abs(r_shoulder[1] - r_ear[1])
     
-    # In shoulder rolls, shoulders move up close to ears
-    return (l_dist < 0.2 or r_dist < 0.2)
+    # In shoulder rolls, shoulders move up close to ears (threshold relaxed to 0.25)
+    return (l_dist < 0.25 or r_dist < 0.25)
 
 
 def verify_neck_side_stretch(landmarks):
@@ -477,10 +477,10 @@ def verify_neck_side_stretch(landmarks):
     
     center_x = (left_ear_x + right_ear_x) / 2
     
-    # Head should be tilted to one side
+    # Head should be tilted to one side - more lenient for reps (threshold lowered to 0.03)
     tilt = abs(nose_x - center_x)
     
-    return tilt > 0.05
+    return tilt > 0.03
 
 
 def verify_spinal_twist(landmarks):
@@ -500,10 +500,10 @@ def verify_spinal_twist(landmarks):
     shoulder_center_x = (l_shoulder[0] + r_shoulder[0]) / 2
     hip_center_x = (l_hip[0] + r_hip[0]) / 2
     
-    # Centers should be offset due to twist
+    # Centers should be offset due to twist - more lenient for reps (threshold lowered to 0.05)
     rotation = abs(shoulder_center_x - hip_center_x)
     
-    return rotation > 0.08
+    return rotation > 0.05
 
 
 def verify_dynamic_lunges(landmarks):
@@ -533,15 +533,15 @@ def verify_dynamic_lunges(landmarks):
 
 # Dictionary mapping stretch names to verification functions
 stretch_verifiers = {
-    "Cat-Cow": verify_cat_cow,
-    "Child's Pose": verify_childs_pose,
-    "Spinal Twist": verify_spinal_twist,
+    "Arm Crossover Stretch": verify_chest_opener,
+    "Wrist Rotations": verify_shoulder_rolls,
+    "Reach Behind the Back": verify_chest_opener,
+    "Neck Tilts": verify_neck_side_stretch,
+    "Side Bends": verify_spinal_twist,
     "Chest Opener": verify_chest_opener,
+    "Spinal Twist": verify_spinal_twist,
     "Shoulder Rolls": verify_shoulder_rolls,
-    "Neck Side Stretch": verify_neck_side_stretch,
-    "Hamstring Stretch": verify_hamstring_stretch,
-    "Dynamic Lunges": verify_dynamic_lunges,
-    "Shoulder Shrugs": verify_shoulder_rolls,  # Similar to shoulder rolls
+    "Neck Rolls": verify_neck_side_stretch,
 }
 
 
@@ -836,7 +836,7 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
 
 
 if __name__ == "__main__":
-    goal = "Desk Break"
+    goal = "Flexibility"
     session_length_min = 5
     session_length_sec = session_length_min * 60
 
@@ -847,5 +847,5 @@ if __name__ == "__main__":
         print("  To enable: export GEMINI_API_KEY=\"your-api-key-here\"\n")
 
     website_url = None
-    
+
     run_interactive_stretch_session(goal, session_length_sec, website_url=website_url)
