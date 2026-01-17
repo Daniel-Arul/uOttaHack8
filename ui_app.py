@@ -257,7 +257,7 @@ class MainWindow(QMainWindow):
 
         # Styling
         self.setStyleSheet("""
-            QMainWindow { background: #0b0f17; color: #e6e6e6; }
+            QMainWindow { background: #FEECD0; color: #cdd4b1; }
             #VideoPanel { background: #111827; border-radius: 18px; }
             #RightPanel { background: #0f172a; border-radius: 18px; padding: 14px; margin-left: 16px; }
             #IssuesList { background: #0b1224; border: 1px solid #22304a; border-radius: 12px; padding: 8px; }
