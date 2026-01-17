@@ -1,4 +1,9 @@
 import os
+import threading
+from time import time
+
+import plyer
+
 os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 
 import sys
@@ -14,7 +19,9 @@ from PySide6.QtWidgets import (
     QFrame, QSpinBox
 )
 
+from main import TIMER_DURATION
 from helpers import extract_pose_data, analyze_posture
+from workout_system.main import main as workout_main
 
 
 # OpenCV to Qt ****************************************************************
@@ -112,6 +119,7 @@ class PostureWorker(QThread):
         self.fps = fps
         self.camera_index = camera_index
         self._running = False
+        self.notifier = Notification()
 
     def stop(self):
         self._running = False
@@ -166,6 +174,11 @@ class PostureWorker(QThread):
                             2
                         )
                         y_offset += 25
+                    # Start/continue the timer when issues are detected
+                    self.notifier.decrement_posture_timer()
+                else:
+                    # Reset timer when no issues
+                    self.notifier.reset_timer()
 
             self.frame_ready.emit(bgr_to_qimage(frame))
             self.issues_ready.emit(issues)
@@ -284,6 +297,7 @@ class MainWindow(QMainWindow):
         self.issues_list.clear()
         if not issues:
             self.issues_list.addItem("No issues detected.")
+
             return
         for issue in issues:
             self.issues_list.addItem(f"{issue['type']}  |  severity: {issue['severity']:.3f}")
@@ -395,6 +409,54 @@ class MainWindow(QMainWindow):
             self.posture_worker = None
         event.accept()
 
+class Notification():
+    def __init__(self):
+        self.posture_timer = {
+            'start_time': None,
+            'notification_sent': False
+        }
+
+        self.workingOut = False
+    
+    def decrement_posture_timer(self):
+        """
+        Manages a 30-second timer for bad posture notifications.
+        - Starts timer when issues are detected
+        - Resets timer when all issues are removed
+        - Sends notification when timer reaches 0
+        """
+        
+        if( self.workingOut ): return # Don't notify if working out to prevent multiple notifications
+
+        # If timer hasn't started yet, start it
+        if self.posture_timer['start_time'] is None:
+            self.posture_timer['start_time'] = time()
+            self.posture_timer['notification_sent'] = False
+        else:
+            # Check if 30 seconds have elapsed
+            elapsed_time = time() - self.posture_timer['start_time']
+            if elapsed_time >= TIMER_DURATION and not self.posture_timer['notification_sent']:
+                # Send notification in a separate thread to avoid blocking the camera
+                notification_thread = threading.Thread(target=self.send_notification, daemon=True)
+                notification_thread.start()
+                self.posture_timer['notification_sent'] = True
+    
+    def reset_timer(self):
+        """Reset the timer when good posture is detected."""
+        self.posture_timer['start_time'] = None
+        self.posture_timer['notification_sent'] = False
+    
+    def send_notification(self):
+        """Send notification in a separate thread to avoid blocking the main camera loop."""
+        plyer.notification.notify(
+            title='Bad Posture Alert!',
+            message='You have been maintaining bad posture for too long. Please correct it. Shrimp'
+        )
+
+        self.workingOut = False
+        workout_main()
+        self.workingOut = True
+    
 
 if __name__ == "__main__":
     # Choose backend like your original main.py comments:
