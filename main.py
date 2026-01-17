@@ -4,17 +4,21 @@ import mediapipe as mp
 import os
 import csv
 from datetime import datetime
-from helpers import extract_pose_data, get_landmark_names, analyze_posture
+from helpers import extract_pose_data, analyze_posture
 from calibrate import calibrate
 
 os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 
 csv_data = []
 
-def classify(data):
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap.set(cv2.CAP_PROP_FPS, 6)
-    
+## MAKE SURE TO CHANGE THE SECOND PARAMETER TO WTV YOU HAD ON MAC ### 
+capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+#####################################################################
+
+capture.set(cv2.CAP_PROP_FPS, 6)
+
+# Main loop where user is informed of whether or not they have bad posture
+def classify(data, cap):    
     if not cap.isOpened():
         print("Error: Could not open camera")
         return
@@ -29,6 +33,7 @@ def classify(data):
     
     frame_count = 0
 
+    #Main camera loop
     while True:
         ret, frame = cap.read()
         
@@ -36,6 +41,7 @@ def classify(data):
             print("Error: Could not read frame")
             break
 
+        #Mediapipe stuff, no need to worry about or touch stuff till the next comment
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = pose.process(frame_rgb)
 
@@ -45,7 +51,6 @@ def classify(data):
             )
             landmarks = extract_pose_data(results)
             
-            # Analyze posture and detect issues
             issues = analyze_posture(data, landmarks.tolist())
             
             if issues:
@@ -57,6 +62,7 @@ def classify(data):
 
         cv2.imshow("frame", frame)
 
+        #Press q to break out of the main loop
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
@@ -65,6 +71,7 @@ def classify(data):
     cap.release()
     cv2.destroyAllWindows()
 
+# This is what runs when the program is run
 if __name__ == "__main__":
-    base_data = calibrate()
-    classify(base_data)
+    base_data = calibrate(capture)
+    classify(base_data, capture)

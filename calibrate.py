@@ -2,10 +2,8 @@ import cv2
 import mediapipe as mp
 from helpers import extract_pose_data
 
-def calibrate():
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap.set(cv2.CAP_PROP_FPS, 6)
-    
+# Function that runs for calibration, returns an array of length 99 corresponding to the x,y,z positions of different body components
+def calibrate(cap):
     if not cap.isOpened():
         print("Error: Could not open camera")
         return
@@ -31,7 +29,4 @@ def calibrate():
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
-            pose.close()
-            cap.release()
-            cv2.destroyAllWindows()
             return landmarks.tolist()
