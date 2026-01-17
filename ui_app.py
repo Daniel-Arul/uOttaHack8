@@ -17,14 +17,14 @@ from PySide6.QtWidgets import (
 from helpers import extract_pose_data, analyze_posture
 
 
-# ---------- OpenCV -> Qt ----------
+# OpenCV to Qt ****************************************************************
 def bgr_to_qimage(frame_bgr):
     h, w, ch = frame_bgr.shape
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     return QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888).copy()
 
 
-# ---------- Calibration Worker (NO cv2.imshow) ----------
+# Calibration Worker (NO cv2.imshow) ******************************************
 class CalibrationWorker(QThread):
     frame_ready = Signal(QImage)
     status = Signal(str)
@@ -98,7 +98,7 @@ class CalibrationWorker(QThread):
         self.done.emit(base_data)
 
 
-# ---------- Posture Worker (NO cv2.imshow) ----------
+# Posture Worker (NO cv2.imshow) *************************************************
 class PostureWorker(QThread):
     frame_ready = Signal(QImage)
     issues_ready = Signal(list)
