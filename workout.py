@@ -17,6 +17,7 @@ os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 YELLOWCAKE_API_KEY = os.getenv("YELLOWCAKE_API_KEY", "")  # Set via environment variable
 YELLOWCAKE_API_URL = "https://api.yellowcake.dev/v1/extract-stream"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")  # For Google Gemini AI pose classification
+DEBUG_AI = os.getenv("DEBUG_AI", "").lower() == "true"  # Set DEBUG_AI=true to see AI calls
 
 # --- Step 1: Stretch database ---
 stretches = [
@@ -235,58 +236,73 @@ Available stretches:
 Based on these coordinates, which stretch is the user most likely performing RIGHT NOW?
 Respond with ONLY the exact stretch name from the list above, or "None" if unclear. Do not include explanation."""
         
-        response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-            headers={
-                "Content-Type": "application/json",
-            },
-            params={
-                "key": GEMINI_API_KEY,
-            },
-            json={
-                "contents": [
-                    {
-                        "parts": [
-                            {
-                                "text": prompt
-                            }
-                        ]
+        try:
+            response = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+                headers={
+                    "Content-Type": "application/json",
+                },
+                params={
+                    "key": GEMINI_API_KEY,
+                },
+                json={
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": prompt
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 50,
+                        "temperature": 0.1,
                     }
-                ],
-                "generationConfig": {
-                    "maxOutputTokens": 50,
-                    "temperature": 0.1,
-                }
-            },
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            try:
-                result = response.json()
-                if result.get('candidates') and len(result['candidates']) > 0:
-                    content = result['candidates'][0].get('content', {})
-                    parts = content.get('parts', [])
-                    if parts and len(parts) > 0:
-                        ai_classification = parts[0].get('text', '').strip()
-                        if ai_classification:
-                            # Check if AI's classification matches expected stretch
-                            is_match = expected_stretch_name.lower() in ai_classification.lower()
-                            return is_match
+                },
+                timeout=10
+            )
+            
+            if DEBUG_AI:
+                print(f"[DEBUG] Gemini API called for {expected_stretch_name}. Status: {response.status_code}")
+            
+            if response.status_code == 200:
+                try:
+                    result = response.json()
+                    if result.get('candidates') and len(result['candidates']) > 0:
+                        content = result['candidates'][0].get('content', {})
+                        parts = content.get('parts', [])
+                        if parts and len(parts) > 0:
+                            ai_classification = parts[0].get('text', '').strip()
+                            if ai_classification:
+                                # Check if AI's classification matches expected stretch
+                                is_match = expected_stretch_name.lower() in ai_classification.lower()
+                                if DEBUG_AI:
+                                    print(f"[DEBUG] AI Classification: {ai_classification} -> Match: {is_match}")
+                                return is_match
+                    return None
+                except (KeyError, IndexError, TypeError) as parse_error:
+                    return None  # Fall back to rule-based on parse error
+            elif response.status_code == 429:
+                # Rate limited - silently fail and use rule-based
+                if DEBUG_AI:
+                    print(f"[DEBUG] Rate limited (429) - switching to rule-based verification")
                 return None
-            except (KeyError, IndexError, TypeError) as parse_error:
-                return None  # Fall back to rule-based on parse error
-        elif response.status_code == 429:
-            # Rate limited - silently fail and use rule-based
+            elif response.status_code == 400:
+                # Bad request - likely malformed prompt
+                return None
+            else:
+                # Other error (including 404)
+                if DEBUG_AI:
+                    print(f"[DEBUG] API error {response.status_code} - using rule-based verification")
+                return None
+            
+            return None  # Return None if API call fails (fall back to rule-based)
+        except (requests.RequestException, requests.Timeout, requests.ConnectionError) as e:
+            # Network error, timeout, SSL error, etc. - silently fall back to rule-based
+            if DEBUG_AI:
+                print(f"[DEBUG] Network error calling Gemini API: {type(e).__name__} - using rule-based verification")
             return None
-        elif response.status_code == 400:
-            # Bad request - likely malformed prompt
-            return None
-        else:
-            # Other error
-            return None
-        
-        return None  # Return None if API call fails (fall back to rule-based)
     except requests.exceptions.Timeout:
         # API call timed out - silently fail
         return None
@@ -647,10 +663,11 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
     pose_confirmed_time = 0
     last_pose_state = False
     
-    # Throttling for AI calls to improve performance
     frame_count = 0
-    ai_check_interval = 5  # Check AI every 5 frames (~6 times per second at 30fps)
+    ai_check_interval = 30
     cached_ai_result = None
+    last_api_call_time = 0
+    min_api_call_delay = 2.0
 
     while stretch_idx < len(session):
         ret, frame = cap.read()
@@ -669,10 +686,13 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
             landmarks = extract_pose_data(results)
             
             # Only call AI every N frames to reduce lag (instead of every frame)
-            if frame_count % ai_check_interval == 0:
+            # Also enforce minimum delay between API calls to avoid rate limiting
+            api_call_time = time.time()
+            if frame_count % ai_check_interval == 0 and (api_call_time - last_api_call_time) >= min_api_call_delay:
                 ai_result = classify_user_stretch_with_ai(landmarks, current_stretch["Stretch"])
                 if ai_result is not None:
                     cached_ai_result = ai_result
+                last_api_call_time = api_call_time
             
             # Use cached AI result or fall back to rule-based verification
             if cached_ai_result is not None:
