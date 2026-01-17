@@ -400,7 +400,7 @@ if __name__ == "__main__":
     # Choose backend like your original main.py comments:
     # Windows: cv2.CAP_DSHOW
     # Mac:     cv2.CAP_AVFOUNDATION
-    camera_backend = cv2.CAP_AVFOUNDATION
+    camera_backend = cv2.CAP_DSHOW
 
     app = QApplication(sys.argv)
     win = MainWindow(camera_backend=camera_backend)
