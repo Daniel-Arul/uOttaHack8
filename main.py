@@ -15,10 +15,11 @@ os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 csv_data = []
 
 ## MAKE SURE TO CHANGE THE SECOND PARAMETER TO WTV YOU HAD ON MAC ### 
-capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+# capture = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+capture = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
 #####################################################################
 
-capture.set(cv2.CAP_PROP_FPS, 6)
+capture.set(cv2.CAP_PROP_FPS, 30)
 
 TIMER_DURATION = 30  # seconds
 
