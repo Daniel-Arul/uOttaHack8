@@ -19,10 +19,6 @@ def get_landmark_names():
         landmark_names.append(landmark.name)
     return landmark_names
 
-def _calculate_distance(p1, p2):
-    """Calculate Euclidean distance between two 3D points"""
-    return np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2 + (p1[2] - p2[2])**2)
-
 def analyze_posture(base_data, current_data, threshold=0.035):
     """Analyze posture deviations from baseline data"""
     if base_data is None or current_data is None:
@@ -118,19 +114,12 @@ def analyze_posture(base_data, current_data, threshold=0.035):
     
     slouch_threshold = 0.05  # 5% threshold
     
-    if distance_change < -slouch_threshold:
-        # Negative change = distance decreased = head moved closer to shoulders = forward slouching
+    if distance_change < -slouch_threshold or distance_change > slouch_threshold:
+        # Big enough change = head moved too close or too far from shoulders = slouching
         issues.append({
-            "type": "Forward Slouching",
+            "type": "Slouching",
             "severity": abs(distance_change),
-            "description": f"Head moving toward shoulders (change: {distance_change:.3f})"
-        })
-    elif distance_change > slouch_threshold:
-        # Positive change = distance increased = head moved away from shoulders = backward slouching
-        issues.append({
-            "type": "Backward Slouching",
-            "severity": distance_change,
-            "description": f"Head moving away from shoulders (change: {distance_change:.3f})"
+            "description": f"Head moving toward or away from shoulders (change: {distance_change:.3f})"
         })
     
     return issues
