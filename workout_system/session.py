@@ -81,8 +81,6 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
             elif "instructions" in stretch_info:
                 print(f"   {stretch_info['instructions']}\n")
     
-    input("Press ENTER when ready to start the workout...")
-    
     print("Opening camera...")
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     
@@ -120,6 +118,8 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
     frame_count = 0
     cached_ai_result = None
     last_api_call_time = 0
+    rep_cooldown = 0
+    REP_COOLDOWN_DURATION = 1  # seconds between reps to avoid double-counting
 
     while stretch_idx < len(session):
         ret, frame = cap.read()
@@ -155,9 +155,14 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
 
         current_time = time.time()
         
+        # Update cooldown
+        if rep_cooldown > 0:
+            rep_cooldown -= (current_time - last_time)
+        
         if is_rep_based:
-            if in_correct_pose and not last_pose_state:
+            if in_correct_pose and not last_pose_state and rep_cooldown <= 0:
                 reps_completed += 1
+                rep_cooldown = REP_COOLDOWN_DURATION  # Start cooldown after counting rep
                 reps_remaining = max(0, current_stretch_info["reps"] - reps_completed)
             last_pose_state = in_correct_pose
         else:
@@ -244,6 +249,7 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
                 if is_rep_based:
                     reps_remaining = current_stretch_info["reps"]
                     reps_completed = 0
+                    rep_cooldown = 0  # Reset cooldown for new stretch
                     print(f"\nNext stretch: {current_stretch['Stretch']} ({current_stretch_info['reps']} reps)")
                 else:
                     remaining_time = current_stretch["Duration_sec"]
