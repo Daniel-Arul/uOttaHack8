@@ -631,11 +631,11 @@ class MainWindow(QMainWindow):
 
     def on_workout_finished(self):
         self.workout_worker = None
-        # Reset the notifier's working out flag so timer can work again
-        if self.posture_worker and self.posture_worker.notifier:
-            self.posture_worker.notifier.workingOut = False
         # Automatically resume posture monitoring
         self.start_posture()
+        # Reset the NEW notifier's working out flag so timer can work again
+        if self.posture_worker and self.posture_worker.notifier:
+            self.posture_worker.notifier.workingOut = False
 
     def on_run_error(self, msg):
         self.set_status(msg)
@@ -685,7 +685,9 @@ class Notification(QObject):
         - Sends notification when timer reaches configured duration
         """
         
-        if( self.workingOut ): return # Don't notify if working out to prevent multiple notifications
+        # Don't notify if working out to prevent multiple notifications
+        if self.workingOut:
+            return
 
         timer_duration = get_timer_duration()
         
@@ -722,6 +724,10 @@ class Notification(QObject):
         # Get a random goal from the user's selected goals
         goals = get_selected_goals()
         selected_goal = random.choice(goals)
+        
+        # Give the posture worker time to see the workingOut flag
+        import time as time_module
+        time_module.sleep(0.5)
         
         # Emit signal to trigger workout (safe across threads)
         print(f"[WORKOUT] Emitting start_workout signal with goal: {selected_goal}...")
