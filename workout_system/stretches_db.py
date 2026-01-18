@@ -14,12 +14,6 @@ stretches = [
         "instructions": "Sit upright. Extend arms forward with palms down.\n  Rotate wrists in circles - 10 rotations clockwise, 10 counter-clockwise.\n  Keep movements smooth and controlled.\n  Repeat on both hands.",
     },
     {
-        "name": "Reach Behind the Back",
-        "target": "Chest/Shoulders",
-        "duration": 30,
-        "instructions": "Sit upright in chair. Clasp hands behind your back at lower back level.\n  Straighten arms and gently push chest forward.\n  Feel the stretch across chest and shoulders.\n  Breathe deeply and hold.",
-    },
-    {
         "name": "Neck Tilts",
         "target": "Neck",
         "reps": 16,
@@ -41,7 +35,7 @@ stretches = [
 
 # Goal to stretches mapping
 goal_to_stretches = {
-    "Back Pain": ["Reach Behind the Back", "Side Bends"],
+    "Back Pain": ["Arm Crossover Stretch", "Side Bends"],
     "Posture": ["Chest Opener", "Reach Behind the Back"],
     "Flexibility": ["Arm Crossover Stretch", "Side Bends", "Neck Rolls"],
     "Desk Break": ["Neck Tilts", "Shoulder Rolls", "Wrist Rotations"],

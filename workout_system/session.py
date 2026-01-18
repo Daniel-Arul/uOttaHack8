@@ -123,7 +123,7 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (255, 255, 255),
+            (255, 0, 0),
             2,
         )
         
@@ -381,7 +381,7 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (255, 255, 255),
+            (255, 0, 0),
             2,
         )
         
