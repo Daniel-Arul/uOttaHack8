@@ -32,22 +32,10 @@ stretches = [
         "instructions": "Sit upright with feet flat. Raise one arm overhead.\n  Gently bend torso toward the opposite side.\n  Keep hips in place, bend only at the waist.\n  Alternate sides, 8 times each direction.",
     },
     {
-        "name": "Chest Opener",
-        "target": "Chest",
-        "duration": 30,
-        "instructions": "Sit upright in chair. Clasp hands behind head, elbows pointing out.\n  Gently squeeze shoulder blades together, opening chest.\n  Keep elbows back and shoulders relaxed.\n  Breathe deeply and hold.",
-    },
-    {
         "name": "Spinal Twist",
         "target": "Torso/Back",
         "duration": 30,
         "instructions": "Sit upright in chair. Cross arms over chest or place opposite hand to knee.\n  Rotate torso toward one side, keeping hips forward.\n  Feel the twist through entire spine.\n  Hold and breathe, then alternate sides.",
-    },
-    {
-        "name": "Shoulder Rolls",
-        "target": "Shoulders",
-        "reps": 20,
-        "instructions": "Sit upright with arms relaxed at sides.\n  Roll shoulders backward in smooth circles - 10 rotations.\n  Then roll forward - 10 rotations.\n  Keep movements controlled and fluid.",
     },
     {
         "name": "Neck Rolls",
@@ -59,8 +47,8 @@ stretches = [
 
 # Goal to stretches mapping
 goal_to_stretches = {
-    "Back Pain": ["Spinal Twist", "Side Bends", "Chest Opener"],
-    "Posture": ["Chest Opener", "Reach Behind the Back", "Shoulder Rolls"],
+    "Back Pain": ["Spinal Twist", "Side Bends"],
+    "Posture": ["Chest Opener", "Reach Behind the Back"],
     "Flexibility": ["Arm Crossover Stretch", "Side Bends", "Neck Rolls"],
     "Desk Break": ["Neck Tilts", "Shoulder Rolls", "Wrist Rotations"],
 }

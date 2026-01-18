@@ -480,7 +480,7 @@ class MainWindow(QMainWindow):
     def trigger_workout_from_notification(self):
         """Slot to trigger workout from notification thread"""
         print("[WORKOUT] Triggering workout from notification...")
-        self.start_workout("Back Pain")
+        self.start_workout("Posture")
 
     def stop_workout(self):
         if self.workout_worker:
