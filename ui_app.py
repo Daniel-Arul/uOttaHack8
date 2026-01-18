@@ -1,6 +1,5 @@
 import os
 import threading
-import random
 from time import time
 
 import plyer
@@ -17,16 +16,15 @@ from PySide6.QtGui import QImage, QPixmap, QFont, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QWidget, QListWidget,
-    QFrame, QSpinBox, QDialog, QCheckBox, QRadioButton,
-    QButtonGroup, QScrollArea
+    QFrame, QSpinBox
 )
 
 from helpers import extract_pose_data, analyze_posture
 from workout_system.main import main as workout_main
 from workout_system.session import run_interactive_stretch_session_qt
-from user_preferences import is_first_run, mark_first_run_complete, get_timer_duration, get_selected_goals, HABIT_GOALS
 
-TIMER_DURATION = 30 
+TIMER_DURATION = 30  # seconds
+
 # OpenCV to Qt ****************************************************************
 def bgr_to_qimage(frame_bgr):
     h, w, ch = frame_bgr.shape
@@ -228,7 +226,7 @@ class WorkoutWorker(QThread):
             return self._stop_requested
 
         try:
-            self.status.emit(f"Starting {self.goal} workout")
+            self.status.emit(f"Starting {self.goal} workout...")
             completed = run_interactive_stretch_session_qt(
                 self.goal,
                 self.session_time_seconds,
@@ -247,119 +245,6 @@ class WorkoutWorker(QThread):
             self.finished.emit()
 
 
-class OnboardingDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        
-        from user_preferences import load_preferences
-        prefs = load_preferences()
-        is_setup = not prefs.get("first_run", True)
-        
-        if is_setup:
-            self.setWindowTitle("Preferences Settings")
-        else:
-            self.setWindowTitle("Welcome to Posture Monitor")
-        
-        self.setGeometry(100, 100, 600, 700)
-        self.setModal(True)
-        
-        self.selected_habits = []
-        self.selected_strictness = "medium"
-        
-        layout = QVBoxLayout()
-        
-        if is_setup:
-            title_text = "Adjust Your Preferences"
-        else:
-            title_text = "Let's Set Up Your Posture Monitor"
-        
-        title = QLabel(title_text)
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        layout.addWidget(title)
-        
-        habits_label = QLabel("What would you like to improve? (Select all that apply)")
-        habits_label_font = QFont()
-        habits_label_font.setPointSize(12)
-        habits_label_font.setBold(True)
-        habits_label.setFont(habits_label_font)
-        layout.addWidget(habits_label)
-        
-        self.habit_checkboxes = {}
-        for habit in HABIT_GOALS.keys():
-            checkbox = QCheckBox(habit)
-            self.habit_checkboxes[habit] = checkbox
-            if habit in prefs.get("selected_habits", []):
-                checkbox.setChecked(True)
-            layout.addWidget(checkbox)
-        
-        layout.addSpacing(20)
-        
-        strictness_label = QLabel("How strict should monitoring be?")
-        strictness_label_font = QFont()
-        strictness_label_font.setPointSize(12)
-        strictness_label_font.setBold(True)
-        strictness_label.setFont(strictness_label_font)
-        layout.addWidget(strictness_label)
-        
-        self.strictness_group = QButtonGroup()
-        self.strictness_radios = {}
-        
-        strictness_options = [
-            ("Strict (10s timer)", "strict"),
-            ("Medium (30s timer) - Recommended", "medium"),
-            ("Relaxed (60s timer)", "relaxed"),
-        ]
-        
-        current_strictness = prefs.get("strictness_level", "medium")
-        for label, value in strictness_options:
-            radio = QRadioButton(label)
-            if value == current_strictness:
-                radio.setChecked(True)
-            self.strictness_radios[value] = radio
-            self.strictness_group.addButton(radio)
-            layout.addWidget(radio)
-        
-        layout.addSpacing(20)
-        
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        start_btn = QPushButton("Start Monitoring")
-        start_btn.clicked.connect(self.on_start_clicked)
-        button_layout.addWidget(start_btn)
-        
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
-        self.setStyleSheet("""
-            QDialog { background: #FEECD0; }
-            QLabel { color: #1f2937; }
-            QCheckBox { color: #1f2937; }
-            QRadioButton { color: #1f2937; }
-            QPushButton { background: #1f2937; color: white; padding: 10px; border-radius: 8px; }
-            QPushButton:hover { background: #374151; }
-        """)
-    
-    def on_start_clicked(self):
-        """Save preferences and close dialog"""
-        self.selected_habits = [habit for habit, checkbox in self.habit_checkboxes.items() if checkbox.isChecked()]
-        
-        if not self.selected_habits:
-            self.selected_habits = ["Back Pain"]
-        
-        for value, radio in self.strictness_radios.items():
-            if radio.isChecked():
-                self.selected_strictness = value
-                break
-        
-        mark_first_run_complete(self.selected_habits, self.selected_strictness)
-        
-        self.accept()
-
-
 # ---------- Main Window ----------
 class MainWindow(QMainWindow):
     def __init__(self, camera_backend, font_family):
@@ -374,13 +259,9 @@ class MainWindow(QMainWindow):
         self.calib_worker = None
         self.posture_worker = None
         self.workout_worker = None
-        
-        # Show onboarding if first run
-        if is_first_run():
-            self.show_onboarding()
 
         # Video preview
-        self.video = QLabel("Camera preview")
+        self.video = QLabel("Click CALIBRATE to begin")
         self.video.setAlignment(Qt.AlignCenter)
         self.video.setMinimumSize(860, 560)
         self.video.setObjectName("VideoPanel")
@@ -390,14 +271,13 @@ class MainWindow(QMainWindow):
         self.issues_list.setObjectName("IssuesList")
 
         # Status line
-        self.status_label = QLabel("Click CALIBRATE to begin· Ensure head and shoulders are in the frame·")
+        self.status_label = QLabel("Sit upright with a neutral spine, shoulders relaxed, facing the camera with your head and shoulders in view·")
         self.status_label.setObjectName("StatusLabel")
 
         # Controls
         self.calibrate_btn = QPushButton("Calibrate")
         self.start_btn = QPushButton("Start")
         self.stop_btn = QPushButton("Stop")
-        self.settings_btn = QPushButton("⚙ Settings")
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
 
@@ -434,8 +314,6 @@ class MainWindow(QMainWindow):
         controls.addSpacing(12)
         controls.addWidget(self.start_btn)
         controls.addWidget(self.stop_btn)
-        controls.addSpacing(12)
-        controls.addWidget(self.settings_btn)
         controls.addStretch()
 
         root = QVBoxLayout()
@@ -451,11 +329,11 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(f"""
             * {{ font-family: "{self.font_family}"; }}
             QMainWindow {{ background: #FEECD0; color: #506b95; font-family: "{self.font_family}"; font-size: 14px;}}
-            #VideoPanel {{ background: #CCD4B1; border-radius: 18px; }}
+            #VideoPanel {{ background: #CCD4B1; border-radius: 18px; font-size: 24px; }}
             #RightPanel {{ background: #DCA278; border-radius: 18px; padding: 14px; margin-left: 16px; }}
             #IssuesList {{ background: #0b1224; border: 1px solid #22304a; border-radius: 12px; padding: 8px; }}
-            #StatusLabel {{ padding: 12px 8px; color: #3e5374; }}
-            QPushButton {{ background: #3e5374; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; font-family: "{self.font_family}";}}
+            #StatusLabel {{ padding: 12px 8px; color: #3e5374; font-size: 16px; }}
+            QPushButton {{ background: #3e5374; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; font-family: "{self.font_family}"; font-size: 16px; }}
             QPushButton:hover {{ background: #506b95; font-family: "{self.font_family}"; }}
             QPushButton:disabled {{ opacity: 0.5; font-family: "{self.font_family}"; }}
             QSpinBox {{ background: #3e5374; border: 1px solid #22304a; border-radius: 6px; padding: 10px; }}
@@ -465,17 +343,6 @@ class MainWindow(QMainWindow):
         self.calibrate_btn.clicked.connect(self.start_calibration)
         self.start_btn.clicked.connect(self.start_posture)
         self.stop_btn.clicked.connect(self.stop_posture)
-        self.settings_btn.clicked.connect(self.show_settings)
-
-    def show_settings(self):
-        """Show settings dialog to change preferences"""
-        dialog = OnboardingDialog(self)
-        dialog.exec()
-
-    def show_onboarding(self):
-        """Show onboarding dialog for new users"""
-        dialog = OnboardingDialog(self)
-        dialog.exec()
 
     # ----- UI slots -----
     def on_frame(self, qimg):
@@ -533,7 +400,7 @@ class MainWindow(QMainWindow):
         self.base_data = base_data
         self.calib_worker = None
 
-        self.set_status("Calibration complete· Press Start·")
+        self.set_status("Calibration complete! Press START")
         self.calibrate_btn.setEnabled(True)
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
@@ -561,7 +428,7 @@ class MainWindow(QMainWindow):
             base_data=self.base_data,
             camera_backend=self.camera_backend,
             main_window=self,
-            fps=30,
+            fps=6,
             camera_index=0
         )
         self.posture_worker.frame_ready.connect(self.on_frame)
@@ -613,7 +480,7 @@ class MainWindow(QMainWindow):
     def trigger_workout_from_notification(self):
         """Slot to trigger workout from notification thread"""
         print("[WORKOUT] Triggering workout from notification...")
-        self.start_workout("Posture")
+        self.start_workout("Back Pain")
 
     def stop_workout(self):
         if self.workout_worker:
@@ -675,27 +542,25 @@ class Notification(QObject):
     
     def decrement_posture_timer(self):
         """
-        Manages a configurable timer for bad posture notifications.
+        Manages a 30-second timer for bad posture notifications.
         - Starts timer when issues are detected
         - Resets timer when all issues are removed
-        - Sends notification when timer reaches configured duration
+        - Sends notification when timer reaches 0
         """
         
         if( self.workingOut ): return # Don't notify if working out to prevent multiple notifications
 
-        timer_duration = get_timer_duration()
-        
         # If timer hasn't started yet, start it
         if self.posture_timer['start_time'] is None:
             self.posture_timer['start_time'] = time()
             self.posture_timer['notification_sent'] = False
-            print(f"[TIMER] Bad posture detected, timer started ({timer_duration}s)")
+            print(f"[TIMER] Bad posture detected, timer started")
         else:
-            # Check if configured time has elapsed
+            # Check if 30 seconds have elapsed
             elapsed_time = time() - self.posture_timer['start_time']
-            print(f"[TIMER] Elapsed time: {elapsed_time:.1f}s / {timer_duration}s")
-            if elapsed_time >= timer_duration and not self.posture_timer['notification_sent']:
-                print(f"[TIMER] {timer_duration}s reached! Triggering workout...")
+            print(f"[TIMER] Elapsed time: {elapsed_time:.1f}s / {TIMER_DURATION}s")
+            if elapsed_time >= TIMER_DURATION and not self.posture_timer['notification_sent']:
+                print(f"[TIMER] 30 seconds reached! Triggering workout...")
                 # Send notification in a separate thread to avoid blocking the camera
                 notification_thread = threading.Thread(target=self.send_notification, daemon=True)
                 notification_thread.start()
@@ -715,20 +580,16 @@ class Notification(QObject):
         )
 
         self.workingOut = True
-        # Get a random goal from the user's selected goals
-        goals = get_selected_goals()
-        selected_goal = random.choice(goals)
-        
         # Emit signal to trigger workout (safe across threads)
-        print(f"[WORKOUT] Emitting start_workout signal with goal: {selected_goal}...")
-        self.start_workout_signal.emit(selected_goal)
+        print("[WORKOUT] Emitting start_workout signal...")
+        self.start_workout_signal.emit("Back Pain")
     
 
 if __name__ == "__main__":
     # Choose backend like your original main.py comments:
     # Windows: cv2.CAP_DSHOW
     # Mac:     cv2.CAP_AVFOUNDATION
-    camera_backend = cv2.CAP_DSHOW
+    camera_backend = cv2.CAP_AVFOUNDATION
 
     app = QApplication(sys.argv)
 
