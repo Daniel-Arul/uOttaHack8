@@ -19,12 +19,11 @@ from PySide6.QtWidgets import (
     QFrame, QSpinBox
 )
 
-from main import TIMER_DURATION
 from helpers import extract_pose_data, analyze_posture
 from workout_system.main import main as workout_main
 from workout_system.session import run_interactive_stretch_session_qt
 
-
+TIMER_DURATION = 30 
 # OpenCV to Qt ****************************************************************
 def bgr_to_qimage(frame_bgr):
     h, w, ch = frame_bgr.shape
@@ -428,7 +427,7 @@ class MainWindow(QMainWindow):
             base_data=self.base_data,
             camera_backend=self.camera_backend,
             main_window=self,
-            fps=6,
+            fps=30,
             camera_index=0
         )
         self.posture_worker.frame_ready.connect(self.on_frame)
