@@ -2,31 +2,46 @@ import os
 import threading
 import random
 from time import time
-
 import plyer
 
 os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
-
 import sys
 import cv2
 import numpy as np
 import mediapipe as mp
-
 from PySide6.QtCore import QThread, Signal, Qt, QObject, QCoreApplication
 from PySide6.QtGui import QImage, QPixmap, QFont, QFontDatabase
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QLabel, QPushButton,
-    QVBoxLayout, QHBoxLayout, QWidget, QListWidget,
-    QFrame, QSpinBox, QDialog, QCheckBox, QRadioButton,
-    QButtonGroup, QScrollArea
+    QApplication,
+    QMainWindow,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWidget,
+    QListWidget,
+    QFrame,
+    QSpinBox,
+    QDialog,
+    QCheckBox,
+    QRadioButton,
+    QButtonGroup,
+    QScrollArea,
 )
-
 from helpers import extract_pose_data, analyze_posture
 from workout_system.main import main as workout_main
 from workout_system.session import run_interactive_stretch_session_qt
-from user_preferences import is_first_run, mark_first_run_complete, get_timer_duration, get_selected_goals, HABIT_GOALS
+from user_preferences import (
+    is_first_run,
+    mark_first_run_complete,
+    get_timer_duration,
+    get_selected_goals,
+    HABIT_GOALS,
+)
 
-TIMER_DURATION = 30 
+TIMER_DURATION = 30
+
+
 # OpenCV to Qt ****************************************************************
 def bgr_to_qimage(frame_bgr):
     h, w, ch = frame_bgr.shape
@@ -38,7 +53,7 @@ def bgr_to_qimage(frame_bgr):
 class CalibrationWorker(QThread):
     frame_ready = Signal(QImage)
     status = Signal(str)
-    done = Signal(list)        # base_data list (length 99)
+    done = Signal(list)  # base_data list (length 99)
     error = Signal(str)
 
     def __init__(self, camera_backend, fps=30, seconds=5, camera_index=0):
@@ -55,53 +70,43 @@ class CalibrationWorker(QThread):
     def run(self):
         cap = cv2.VideoCapture(self.camera_index, self.camera_backend)
         cap.set(cv2.CAP_PROP_FPS, self.fps)
-
         if not cap.isOpened():
             self.error.emit("Calibration: could not open camera.")
             return
-
         mp_pose = mp.solutions.pose
         pose = mp_pose.Pose()
-
         frames_needed = max(1, int(self.seconds * self.fps))
         collected = []
-
         self._running = True
         self.status.emit(f"Calibrating… sit upright ({self.seconds}s)")
-
         frames_seen = 0
         while self._running and frames_seen < frames_needed:
             ret, frame = cap.read()
             if not ret:
                 self.error.emit("Calibration: could not read frame.")
                 break
-
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = pose.process(frame_rgb)
-
             # We only collect if landmarks exist
             if results.pose_landmarks:
                 landmarks = extract_pose_data(results)
                 # landmarks.tolist() should be length 99
                 collected.append(landmarks.tolist())
-
             # show preview inside Qt
             self.frame_ready.emit(bgr_to_qimage(frame))
-
             frames_seen += 1
             # small throttle; rely on your fps cap too
             self.msleep(int(1000 / max(1, self.fps)))
-
         cap.release()
         try:
             pose.close()
         except Exception:
             pass
-
         if not collected:
-            self.error.emit("Calibration failed: no pose detected. Try better lighting / full body in frame.")
+            self.error.emit(
+                "Calibration failed: no pose detected. Try better lighting / full body in frame."
+            )
             return
-
         # Average across collected frames
         base_data = np.mean(np.array(collected, dtype=float), axis=0).tolist()
         self.status.emit("Calibration complete.")
@@ -132,30 +137,23 @@ class PostureWorker(QThread):
         if self.base_data is None:
             self.error.emit("Run: please calibrate first.")
             return
-
         cap = cv2.VideoCapture(self.camera_index, self.camera_backend)
         cap.set(cv2.CAP_PROP_FPS, self.fps)
-
         if not cap.isOpened():
             self.error.emit("Run: could not open camera.")
             return
-
         mp_pose = mp.solutions.pose
         mp_drawing = mp.solutions.drawing_utils
         pose = mp_pose.Pose()
-
         self._running = True
         self.status.emit("Running posture monitor…")
-
         while self._running:
             ret, frame = cap.read()
             if not ret:
                 self.error.emit("Run: could not read frame.")
                 break
-
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = pose.process(frame_rgb)
-
             issues = []
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(
@@ -163,7 +161,6 @@ class PostureWorker(QThread):
                 )
                 landmarks = extract_pose_data(results)
                 issues = analyze_posture(self.base_data, landmarks.tolist())
-
                 # Keep your on-frame red text overlay
                 if issues:
                     y_offset = 30
@@ -175,7 +172,7 @@ class PostureWorker(QThread):
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.6,
                             (0, 0, 255),
-                            2
+                            2,
                         )
                         y_offset += 25
                     # Start/continue the timer when issues are detected
@@ -186,18 +183,14 @@ class PostureWorker(QThread):
                     # Reset timer when no issues
                     if not self.notifier.workingOut:
                         self.notifier.reset_timer()
-
             self.frame_ready.emit(bgr_to_qimage(frame))
             self.issues_ready.emit(issues)
-
             self.msleep(int(1000 / max(1, self.fps)))
-
         cap.release()
         try:
             pose.close()
         except Exception:
             pass
-
         self.status.emit("Stopped.")
 
 
@@ -208,7 +201,9 @@ class WorkoutWorker(QThread):
     finished = Signal()
     error = Signal(str)
 
-    def __init__(self, goal, session_time_seconds, camera_backend, fps=30, camera_index=0):
+    def __init__(
+        self, goal, session_time_seconds, camera_backend, fps=30, camera_index=0
+    ):
         super().__init__()
         self.goal = goal
         self.session_time_seconds = session_time_seconds
@@ -237,14 +232,14 @@ class WorkoutWorker(QThread):
                 self.goal,
                 self.session_time_seconds,
                 frame_callback,
-                should_stop_callback
+                should_stop_callback,
             )
-            
+
             if completed:
                 self.status.emit("Workout complete! Great job!")
             else:
                 self.status.emit("Workout stopped.")
-            
+
             self.finished.emit()
         except Exception as e:
             self.error.emit(f"Workout error: {str(e)}")
@@ -254,43 +249,44 @@ class WorkoutWorker(QThread):
 class OnboardingDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         from user_preferences import load_preferences
+
         prefs = load_preferences()
         is_setup = not prefs.get("first_run", True)
-        
+
         if is_setup:
             self.setWindowTitle("Preferences Settings")
         else:
             self.setWindowTitle("Welcome to Posture Monitor")
-        
+
         self.setGeometry(100, 100, 600, 700)
         self.setModal(True)
-        
+
         self.selected_habits = []
         self.selected_strictness = "medium"
-        
+
         layout = QVBoxLayout()
-        
+
         if is_setup:
             title_text = "Adjust Your Preferences"
         else:
             title_text = "Let's Set Up Your Posture Monitor"
-        
+
         title = QLabel(title_text)
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
         title.setFont(title_font)
         layout.addWidget(title)
-        
+
         habits_label = QLabel("What would you like to improve? (Select all that apply)")
         habits_label_font = QFont()
         habits_label_font.setPointSize(12)
         habits_label_font.setBold(True)
         habits_label.setFont(habits_label_font)
         layout.addWidget(habits_label)
-        
+
         self.habit_checkboxes = {}
         for habit in HABIT_GOALS.keys():
             checkbox = QCheckBox(habit)
@@ -298,25 +294,25 @@ class OnboardingDialog(QDialog):
             if habit in prefs.get("selected_habits", []):
                 checkbox.setChecked(True)
             layout.addWidget(checkbox)
-        
+
         layout.addSpacing(20)
-        
+
         strictness_label = QLabel("How strict should monitoring be?")
         strictness_label_font = QFont()
         strictness_label_font.setPointSize(12)
         strictness_label_font.setBold(True)
         strictness_label.setFont(strictness_label_font)
         layout.addWidget(strictness_label)
-        
+
         self.strictness_group = QButtonGroup()
         self.strictness_radios = {}
-        
+
         strictness_options = [
             ("Strict (10s timer)", "strict"),
             ("Medium (30s timer) - Recommended", "medium"),
             ("Relaxed (60s timer)", "relaxed"),
         ]
-        
+
         current_strictness = prefs.get("strictness_level", "medium")
         for label, value in strictness_options:
             radio = QRadioButton(label)
@@ -325,42 +321,48 @@ class OnboardingDialog(QDialog):
             self.strictness_radios[value] = radio
             self.strictness_group.addButton(radio)
             layout.addWidget(radio)
-        
+
         layout.addSpacing(20)
-        
+
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
         start_btn = QPushButton("Start Monitoring")
         start_btn.clicked.connect(self.on_start_clicked)
         button_layout.addWidget(start_btn)
-        
+
         layout.addLayout(button_layout)
-        
+
         self.setLayout(layout)
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QDialog { background: #FEECD0; }
             QLabel { color: #1f2937; }
             QCheckBox { color: #1f2937; }
             QRadioButton { color: #1f2937; }
             QPushButton { background: #1f2937; color: white; padding: 10px; border-radius: 8px; }
             QPushButton:hover { background: #374151; }
-        """)
-    
+        """
+        )
+
     def on_start_clicked(self):
         """Save preferences and close dialog"""
-        self.selected_habits = [habit for habit, checkbox in self.habit_checkboxes.items() if checkbox.isChecked()]
-        
+        self.selected_habits = [
+            habit
+            for habit, checkbox in self.habit_checkboxes.items()
+            if checkbox.isChecked()
+        ]
+
         if not self.selected_habits:
             self.selected_habits = ["Back Pain"]
-        
+
         for value, radio in self.strictness_radios.items():
             if radio.isChecked():
                 self.selected_strictness = value
                 break
-        
+
         mark_first_run_complete(self.selected_habits, self.selected_strictness)
-        
+
         self.accept()
 
 
@@ -370,38 +372,34 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Posture Monitor")
         self.resize(1200, 700)
-
         self.camera_backend = camera_backend
         self.base_data = None
         self.font_family = font_family
-
         self.calib_worker = None
         self.posture_worker = None
         self.workout_worker = None
-        
+
         # Create a shared notifier instance for all posture workers
         self.notifier = Notification(self)
-
         # Show onboarding if first run
         if is_first_run():
             self.show_onboarding()
-
         # Video preview
         self.video = QLabel("Click CALIBRATE to begin")
         self.video.setAlignment(Qt.AlignCenter)
         self.video.setMinimumSize(860, 560)
         self.video.setObjectName("VideoPanel")
-
         # Issues list
         self.issues_list = QListWidget()
         self.issues_list.setObjectName("IssuesList")
-
+        # Dynamic title for right panel
+        self.right_title = QLabel("Posture Issues")
+        self.right_title.setStyleSheet("font-size: 16px; font-weight: 600;")
         # Status line
         self.status_label = QLabel(
             "Sit upright with a neutral spine, shoulders relaxed, facing the camera with your head and shoulders in view"
         )
         self.status_label.setObjectName("StatusLabel")
-
         # Controls
         self.calibrate_btn = QPushButton("Calibrate")
         self.start_btn = QPushButton("Start")
@@ -409,36 +407,27 @@ class MainWindow(QMainWindow):
         self.settings_btn = QPushButton("⚙ Settings")
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
-
         self.seconds_spin = QSpinBox()
         self.seconds_spin.setRange(2, 15)
         self.seconds_spin.setValue(5)
         self.seconds_spin.setSuffix("s")
-
         # Right panel
         right_layout = QVBoxLayout()
-        title = QLabel("Posture Issues")
-        title.setStyleSheet("font-size: 16px; font-weight: 600;")
-        right_layout.addWidget(title)
+        right_layout.addWidget(self.right_title)
         right_layout.addWidget(self.issues_list)
-
         right_frame = QFrame()
         right_frame.setObjectName("RightPanel")
         right_frame.setLayout(right_layout)
-
         # Top layout
         top = QHBoxLayout()
         top.addWidget(self.video, stretch=3)
         top.addWidget(right_frame, stretch=1)
-
         # Controls layout
         controls = QHBoxLayout()
         controls.addWidget(self.calibrate_btn)
-
         label = QLabel("Calibration:")
         label.setStyleSheet("color: #3e5374;")
         controls.addWidget(label)
-
         controls.addWidget(self.seconds_spin)
         controls.addSpacing(12)
         controls.addWidget(self.start_btn)
@@ -446,16 +435,13 @@ class MainWindow(QMainWindow):
         controls.addSpacing(12)
         controls.addWidget(self.settings_btn)
         controls.addStretch()
-
         root = QVBoxLayout()
         root.addLayout(top)
         root.addWidget(self.status_label)
         root.addLayout(controls)
-
         central = QWidget()
         central.setLayout(root)
         self.setCentralWidget(central)
-
         # Styling
         self.setStyleSheet(
             f"""
@@ -471,11 +457,10 @@ class MainWindow(QMainWindow):
             QSpinBox {{ background: #3e5374; border: 1px solid #22304a; border-radius: 6px; padding: 10px; }}
         """
         )
-
         # Wiring
         self.calibrate_btn.clicked.connect(self.start_calibration)
         self.start_btn.clicked.connect(self.start_posture)
-        self.stop_btn.clicked.connect(self.stop_posture)
+        self.stop_btn.clicked.connect(self.stop_current)
         self.settings_btn.clicked.connect(self.show_settings)
 
     def show_settings(self):
@@ -491,9 +476,9 @@ class MainWindow(QMainWindow):
     # ----- UI slots -----
     def on_frame(self, qimg):
         pix = QPixmap.fromImage(qimg)
-        self.video.setPixmap(pix.scaled(
-            self.video.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-        ))
+        self.video.setPixmap(
+            pix.scaled(self.video.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
 
     def on_issues(self, issues):
         self.issues_list.clear()
@@ -504,7 +489,7 @@ class MainWindow(QMainWindow):
             item_str = f"{issue['severity']:.3f}"
             item_str = item_str.split(".")
             item_str = item_str[0] + "·" + item_str[1]
-            self.issues_list.addItem(f"{issue['type']}  |  severity: {item_str}")
+            self.issues_list.addItem(f"{issue['type']} | severity: {item_str}")
 
     def set_status(self, msg):
         self.status_label.setText(msg)
@@ -515,24 +500,17 @@ class MainWindow(QMainWindow):
     # ----- Calibration -----
     def start_calibration(self):
         # Stop posture run if active
-        self.stop_posture()
-
+        self.stop_current()
         # Avoid double-start
         if self.calib_worker is not None:
             return
-
         self.calibrate_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
         self.issues_list.clear()
-
         seconds = int(self.seconds_spin.value())
-
         self.calib_worker = CalibrationWorker(
-            camera_backend=self.camera_backend,
-            fps=30,
-            seconds=seconds,
-            camera_index=0
+            camera_backend=self.camera_backend, fps=30, seconds=seconds, camera_index=0
         )
         self.calib_worker.frame_ready.connect(self.on_frame)
         self.calib_worker.status.connect(self.set_status)
@@ -543,7 +521,6 @@ class MainWindow(QMainWindow):
     def on_calib_done(self, base_data):
         self.base_data = base_data
         self.calib_worker = None
-
         self.set_status("Calibration complete· Press Start·")
         self.calibrate_btn.setEnabled(True)
         self.start_btn.setEnabled(True)
@@ -563,17 +540,16 @@ class MainWindow(QMainWindow):
             return
         if self.posture_worker is not None:
             return
-
+        self.right_title.setText("Posture Issues")
         self.calibrate_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-
         self.posture_worker = PostureWorker(
             base_data=self.base_data,
             camera_backend=self.camera_backend,
             main_window=self,
             fps=30,
-            camera_index=0
+            camera_index=0,
         )
         self.posture_worker.frame_ready.connect(self.on_frame)
         self.posture_worker.issues_ready.connect(self.on_issues)
@@ -587,7 +563,6 @@ class MainWindow(QMainWindow):
             self.posture_worker.stop()
             self.posture_worker.wait()
             self.posture_worker = None
-
         self.calibrate_btn.setEnabled(True)
         self.start_btn.setEnabled(self.base_data is not None)
         self.stop_btn.setEnabled(False)
@@ -598,26 +573,26 @@ class MainWindow(QMainWindow):
         if self.workout_worker is not None:
             print("[WORKOUT] Workout already running, ignoring request")
             return
-
         # Mark as working out and reset timer BEFORE stopping posture monitoring
         # This prevents the timer from restarting
-        if hasattr(self, 'notifier') and self.notifier:
+        if hasattr(self, "notifier") and self.notifier:
             self.notifier.workingOut = True
             self.notifier.reset_timer()
-
         # Stop posture monitoring
         self.stop_posture()
-
+        # Update UI for workout mode
+        self.right_title.setText("Workout in Progress")
+        self.issues_list.clear()
+        self.issues_list.addItem("Performing workout...")
         self.calibrate_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-
         self.workout_worker = WorkoutWorker(
             goal=goal,
             session_time_seconds=60,  # 1 minute workout
             camera_backend=self.camera_backend,
             fps=30,
-            camera_index=0
+            camera_index=0,
         )
         self.workout_worker.frame_ready.connect(self.on_frame)
         self.workout_worker.status.connect(self.set_status)
@@ -636,6 +611,15 @@ class MainWindow(QMainWindow):
             self.workout_worker.request_stop()
             self.workout_worker.wait()
             self.workout_worker = None
+        self.calibrate_btn.setEnabled(True)
+        self.start_btn.setEnabled(self.base_data is not None)
+        self.stop_btn.setEnabled(False)
+
+    def stop_current(self):
+        if self.posture_worker:
+            self.stop_posture()
+        elif self.workout_worker:
+            self.stop_workout()
 
     def on_workout_error(self, msg):
         self.set_status(msg)
@@ -676,20 +660,18 @@ class MainWindow(QMainWindow):
             self.workout_worker = None
         event.accept()
 
+
 class Notification(QObject):
     start_workout_signal = Signal(str)  # Signal to trigger workout
-    
+
     def __init__(self, main_window):
         super().__init__()
-        self.posture_timer = {
-            'start_time': None,
-            'notification_sent': False
-        }
+        self.posture_timer = {"start_time": None, "notification_sent": False}
         self.main_window = main_window
         self.workingOut = False
         # Connect the signal to the main window's slot
         self.start_workout_signal.connect(main_window.start_workout)
-    
+
     def decrement_posture_timer(self):
         """
         Manages a configurable timer for bad posture notifications.
@@ -697,53 +679,57 @@ class Notification(QObject):
         - Resets timer when all issues are removed
         - Sends notification when timer reaches configured duration
         """
-        
+
         # Don't notify if working out to prevent multiple notifications
         if self.workingOut:
             return
-
         timer_duration = get_timer_duration()
-        
+
         # If timer hasn't started yet, start it
-        if self.posture_timer['start_time'] is None:
-            self.posture_timer['start_time'] = time()
-            self.posture_timer['notification_sent'] = False
+        if self.posture_timer["start_time"] is None:
+            self.posture_timer["start_time"] = time()
+            self.posture_timer["notification_sent"] = False
             print(f"[TIMER] Bad posture detected, timer started ({timer_duration}s)")
         else:
             # Check if configured time has elapsed
-            elapsed_time = time() - self.posture_timer['start_time']
+            elapsed_time = time() - self.posture_timer["start_time"]
             print(f"[TIMER] Elapsed time: {elapsed_time:.1f}s / {timer_duration}s")
-            if elapsed_time >= timer_duration and not self.posture_timer['notification_sent']:
+            if (
+                elapsed_time >= timer_duration
+                and not self.posture_timer["notification_sent"]
+            ):
                 print(f"[TIMER] {timer_duration}s reached! Triggering workout...")
                 # Set workingOut immediately to prevent timer from restarting or resetting
                 self.workingOut = True
                 # Send notification in a separate thread to avoid blocking the camera
-                notification_thread = threading.Thread(target=self.send_notification, daemon=True)
+                notification_thread = threading.Thread(
+                    target=self.send_notification, daemon=True
+                )
                 notification_thread.start()
-                self.posture_timer['notification_sent'] = True
-    
+                self.posture_timer["notification_sent"] = True
+
     def reset_timer(self):
         """Reset the timer when good posture is detected."""
-        self.posture_timer['start_time'] = None
-        self.posture_timer['notification_sent'] = False
-    
+        self.posture_timer["start_time"] = None
+        self.posture_timer["notification_sent"] = False
+
     def send_notification(self):
         """Send notification in a separate thread to avoid blocking the main camera loop."""
         print("[WORKOUT] Sending notification and starting workout...")
         plyer.notification.notify(
-            title='Bad Posture Alert!',
-            message='You have been maintaining bad posture for too long. Please correct it. Shrimp'
+            title="Bad Posture Alert!",
+            message="You have been maintaining bad posture for too long. Please correct it. Shrimp",
         )
-
         # workingOut is already set to True in decrement_posture_timer()
         # Get a random goal from the user's selected goals
         goals = get_selected_goals()
         selected_goal = random.choice(goals)
-        
+
         # Small delay to ensure notifications are processed
         import time as time_module
+
         time_module.sleep(0.1)
-        
+
         # Emit signal to trigger workout (safe across threads)
         print(f"[WORKOUT] Emitting start_workout signal with goal: {selected_goal}...")
         self.start_workout_signal.emit(selected_goal)
@@ -752,32 +738,25 @@ class Notification(QObject):
 if __name__ == "__main__":
     # Choose backend like your original main.py comments:
     # Windows: cv2.CAP_DSHOW
-    # Mac:     cv2.CAP_AVFOUNDATION
+    # Mac: cv2.CAP_AVFOUNDATION
     camera_backend = cv2.CAP_DSHOW
-
     app = QApplication(sys.argv)
-
     # FONTS --------------------------------------------------------------------------
-
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     font_path = os.path.join(
         BASE_DIR, "assets", "fonts", "ethereal", "EtherealDemo-SemiBold.otf"
     )
-
     font_id = QFontDatabase.addApplicationFont(font_path)
-
     if font_id == -1:
         print("Failed to load font")
         family = "Arial"  # Fallback font
     else:
         families = QFontDatabase.applicationFontFamilies(font_id)
         print("Loaded font families:", families)
-        family = families[0]   # THIS is the real name Qt uses
+        family = families[0]  # THIS is the real name Qt uses
         app.setFont(QFont(family, 10))
-
     # --------------------------------------------------------------------------------
-
     win = MainWindow(camera_backend=camera_backend, font_family=family)
     win.show()
-    
+
     sys.exit(app.exec())
