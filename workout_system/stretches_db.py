@@ -8,12 +8,6 @@ stretches = [
         "instructions": "Sit upright in chair. Bring one arm across your body at shoulder height.\n  Use opposite arm to gently pull it closer to your chest.\n  Keep shoulders relaxed. Hold and breathe.\n  Alternate sides.",
     },
     {
-        "name": "Wrist Rotations",
-        "target": "Wrists/Forearms",
-        "reps": 4,
-        "instructions": "Sit upright. Extend arms forward with palms down.\n  Rotate wrists in circles - 10 rotations clockwise, 10 counter-clockwise.\n  Keep movements smooth and controlled.\n  Repeat on both hands.",
-    },
-    {
         "name": "Neck Tilts",
         "target": "Neck",
         "reps": 4,
@@ -38,5 +32,5 @@ goal_to_stretches = {
     "Back Pain": ["Arm Crossover Stretch", "Side Bends"],
     "Posture": ["Chest Opener", "Reach Behind the Back"],
     "Flexibility": ["Arm Crossover Stretch", "Side Bends", "Neck Rolls"],
-    "Desk Break": ["Neck Tilts", "Shoulder Rolls", "Wrist Rotations"],
+    "Desk Break": ["Neck Tilts", "Shoulder Rolls"],
 }
