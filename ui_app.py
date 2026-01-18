@@ -427,7 +427,7 @@ class MainWindow(QMainWindow):
             base_data=self.base_data,
             camera_backend=self.camera_backend,
             main_window=self,
-            fps=6,
+            fps=30,
             camera_index=0
         )
         self.posture_worker.frame_ready.connect(self.on_frame)
