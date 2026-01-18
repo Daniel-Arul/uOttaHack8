@@ -4,6 +4,7 @@ import random
 import cv2
 import time
 import mediapipe as mp
+import winsound
 from .stretches_db import stretches, goal_to_stretches
 from .utils import extract_pose_data
 from .ai import fetch_stretch_pose_from_web, classify_user_stretch_with_ai
@@ -24,16 +25,16 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
     Returns:
         True if workout completed successfully, False if interrupted
     """
-    
+
     # Generate session first to show instructions
     session = generate_stretch_session(goal, session_time_seconds)
-    
+
     if not session:
         return False
-    
+
     # Open camera
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    
+
     if not cap.isOpened():
         return False
 
@@ -45,18 +46,18 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
     current_stretch = session[stretch_idx]
     current_stretch_info = next((s for s in stretches if s["name"] == current_stretch["Stretch"]), None)
     is_rep_based = "reps" in current_stretch_info
-    
+
     if is_rep_based:
         reps_remaining = current_stretch_info["reps"]
         reps_completed = 0
     else:
         remaining_time = current_stretch["Duration_sec"]
-    
+
     last_time = time.time()
     in_correct_pose = False
     pose_confirmed_time = 0
     last_pose_state = False
-    
+
     frame_count = 0
     cached_ai_result = None
     last_api_call_time = 0
@@ -65,7 +66,7 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
 
     while stretch_idx < len(session) and not should_stop_callback():
         ret, frame = cap.read()
-        
+
         if not ret:
             break
 
@@ -77,14 +78,14 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
                 frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
             )
             landmarks = extract_pose_data(results)
-            
+
             api_call_time = time.time()
             if frame_count % AI_CHECK_INTERVAL == 0 and (api_call_time - last_api_call_time) >= MIN_API_CALL_DELAY:
                 ai_result = classify_user_stretch_with_ai(landmarks, current_stretch["Stretch"])
                 if ai_result is not None:
                     cached_ai_result = ai_result
                 last_api_call_time = api_call_time
-            
+
             if cached_ai_result is not None:
                 in_correct_pose = cached_ai_result
             else:
@@ -95,11 +96,11 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
             in_correct_pose = False
 
         current_time = time.time()
-        
+
         # Update cooldown
         if rep_cooldown > 0:
             rep_cooldown -= (current_time - last_time)
-        
+
         if is_rep_based:
             if in_correct_pose and not last_pose_state and rep_cooldown <= 0:
                 reps_completed += 1
@@ -111,29 +112,29 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
                 time_elapsed = current_time - last_time
                 remaining_time -= time_elapsed
                 pose_confirmed_time += time_elapsed
-        
+
         last_time = current_time
 
         # Display information on frame
         frame_height, frame_width = frame.shape[:2]
-        
+
         cv2.putText(
             frame,
             f"Stretch: {current_stretch['Stretch']}",
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (255, 0, 0),
+            (255, 150, 100),
             2,
         )
-        
+
         timer_color = (0, 255, 0) if in_correct_pose else (0, 0, 255)
-        
+
         if is_rep_based:
             counter_text = f"Reps: {reps_completed}/{current_stretch_info['reps']}"
         else:
             counter_text = f"Time: {max(0, int(remaining_time))}s"
-        
+
         cv2.putText(
             frame,
             counter_text,
@@ -143,7 +144,7 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
             timer_color,
             2,
         )
-        
+
         if GEMINI_API_KEY:
             status_text = "✓ CORRECT POSE (AI)" if in_correct_pose else "✗ Adjust position (AI)"
         else:
@@ -178,28 +179,29 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
             stretch_complete = reps_completed >= current_stretch_info["reps"]
         else:
             stretch_complete = remaining_time <= 0
-        
+
         if stretch_complete:
+            play_completion_sound()
             stretch_idx += 1
-            
+
             if stretch_idx < len(session):
                 current_stretch = session[stretch_idx]
                 current_stretch_info = next((s for s in stretches if s["name"] == current_stretch["Stretch"]), None)
                 is_rep_based = "reps" in current_stretch_info
-                
+
                 if is_rep_based:
                     reps_remaining = current_stretch_info["reps"]
                     reps_completed = 0
                     rep_cooldown = 0  # Reset cooldown for new stretch
                 else:
                     remaining_time = current_stretch["Duration_sec"]
-                
+
                 pose_confirmed_time = 0
                 last_pose_state = False
                 cached_ai_result = None
-            
+
             last_time = time.time()
-        
+
         frame_count += 1
 
     pose.close()
@@ -208,6 +210,11 @@ def run_interactive_stretch_session_qt(goal, session_time_seconds, frame_callbac
     return stretch_idx == len(session)
 
 
+def play_completion_sound():
+    try:
+        winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+    except Exception:
+        pass
 
 
 def generate_stretch_session(goal, session_time_seconds):
@@ -381,7 +388,7 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (255, 0, 0),
+            (255, 150, 100),
             2,
         )
         
@@ -437,6 +444,7 @@ def run_interactive_stretch_session(goal, session_time_seconds, website_url=None
             stretch_complete = remaining_time <= 0
         
         if stretch_complete:
+            play_completion_sound()
             print(f"✓ Completed: {current_stretch['Stretch']}")
             stretch_idx += 1
             

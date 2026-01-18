@@ -122,7 +122,8 @@ class PostureWorker(QThread):
         self.fps = fps
         self.camera_index = camera_index
         self._running = False
-        self.notifier = Notification(main_window)
+        # Use the shared notifier from main_window
+        self.notifier = main_window.notifier
 
     def stop(self):
         self._running = False
@@ -178,10 +179,13 @@ class PostureWorker(QThread):
                         )
                         y_offset += 25
                     # Start/continue the timer when issues are detected
-                    self.notifier.decrement_posture_timer()
+                    # Only if not currently working out
+                    if not self.notifier.workingOut:
+                        self.notifier.decrement_posture_timer()
                 else:
                     # Reset timer when no issues
-                    self.notifier.reset_timer()
+                    if not self.notifier.workingOut:
+                        self.notifier.reset_timer()
 
             self.frame_ready.emit(bgr_to_qimage(frame))
             self.issues_ready.emit(issues)
@@ -374,6 +378,9 @@ class MainWindow(QMainWindow):
         self.calib_worker = None
         self.posture_worker = None
         self.workout_worker = None
+        
+        # Create a shared notifier instance for all posture workers
+        self.notifier = Notification(self)
 
         # Show onboarding if first run
         if is_first_run():
@@ -573,7 +580,6 @@ class MainWindow(QMainWindow):
         self.posture_worker.status.connect(self.set_status)
         self.posture_worker.error.connect(self.on_run_error)
         self.posture_worker.finished.connect(self.on_run_finished)
-        self.posture_worker.notifier = Notification(self)
         self.posture_worker.start()
 
     def stop_posture(self):
@@ -592,6 +598,12 @@ class MainWindow(QMainWindow):
         if self.workout_worker is not None:
             print("[WORKOUT] Workout already running, ignoring request")
             return
+
+        # Mark as working out and reset timer BEFORE stopping posture monitoring
+        # This prevents the timer from restarting
+        if hasattr(self, 'notifier') and self.notifier:
+            self.notifier.workingOut = True
+            self.notifier.reset_timer()
 
         # Stop posture monitoring
         self.stop_posture()
@@ -633,9 +645,10 @@ class MainWindow(QMainWindow):
         self.workout_worker = None
         # Automatically resume posture monitoring
         self.start_posture()
-        # Reset the NEW notifier's working out flag so timer can work again
-        if self.posture_worker and self.posture_worker.notifier:
-            self.posture_worker.notifier.workingOut = False
+        # Reset the shared notifier's working out flag so timer can work again
+        if self.notifier:
+            self.notifier.workingOut = False
+            self.notifier.reset_timer()
 
     def on_run_error(self, msg):
         self.set_status(msg)
@@ -702,6 +715,8 @@ class Notification(QObject):
             print(f"[TIMER] Elapsed time: {elapsed_time:.1f}s / {timer_duration}s")
             if elapsed_time >= timer_duration and not self.posture_timer['notification_sent']:
                 print(f"[TIMER] {timer_duration}s reached! Triggering workout...")
+                # Set workingOut immediately to prevent timer from restarting or resetting
+                self.workingOut = True
                 # Send notification in a separate thread to avoid blocking the camera
                 notification_thread = threading.Thread(target=self.send_notification, daemon=True)
                 notification_thread.start()
@@ -720,14 +735,14 @@ class Notification(QObject):
             message='You have been maintaining bad posture for too long. Please correct it. Shrimp'
         )
 
-        self.workingOut = True
+        # workingOut is already set to True in decrement_posture_timer()
         # Get a random goal from the user's selected goals
         goals = get_selected_goals()
         selected_goal = random.choice(goals)
         
-        # Give the posture worker time to see the workingOut flag
+        # Small delay to ensure notifications are processed
         import time as time_module
-        time_module.sleep(0.5)
+        time_module.sleep(0.1)
         
         # Emit signal to trigger workout (safe across threads)
         print(f"[WORKOUT] Emitting start_workout signal with goal: {selected_goal}...")
