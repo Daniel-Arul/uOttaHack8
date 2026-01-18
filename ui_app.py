@@ -12,7 +12,7 @@ import numpy as np
 import mediapipe as mp
 
 from PySide6.QtCore import QThread, Signal, Qt, QObject, QCoreApplication
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QPixmap, QFont, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QWidget, QListWidget,
@@ -247,13 +247,14 @@ class WorkoutWorker(QThread):
 
 # ---------- Main Window ----------
 class MainWindow(QMainWindow):
-    def __init__(self, camera_backend):
+    def __init__(self, camera_backend, font_family):
         super().__init__()
         self.setWindowTitle("Posture Monitor")
         self.resize(1200, 700)
 
         self.camera_backend = camera_backend
         self.base_data = None
+        self.font_family = font_family
 
         self.calib_worker = None
         self.posture_worker = None
@@ -270,7 +271,7 @@ class MainWindow(QMainWindow):
         self.issues_list.setObjectName("IssuesList")
 
         # Status line
-        self.status_label = QLabel("Calibrate to begin.")
+        self.status_label = QLabel("Click CALIBRATE to begin· Ensure head and shoulders are in the frame·")
         self.status_label.setObjectName("StatusLabel")
 
         # Controls
@@ -304,7 +305,11 @@ class MainWindow(QMainWindow):
         # Controls layout
         controls = QHBoxLayout()
         controls.addWidget(self.calibrate_btn)
-        controls.addWidget(QLabel("Calibration:"))
+
+        label = QLabel("Calibration:")
+        label.setStyleSheet("color: #3e5374;")
+        controls.addWidget(label)
+
         controls.addWidget(self.seconds_spin)
         controls.addSpacing(12)
         controls.addWidget(self.start_btn)
@@ -321,16 +326,17 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         # Styling
-        self.setStyleSheet("""
-            QMainWindow { background: #FEECD0; color: #cdd4b1; }
-            #VideoPanel { background: #111827; border-radius: 18px; }
-            #RightPanel { background: #0f172a; border-radius: 18px; padding: 14px; margin-left: 16px; }
-            #IssuesList { background: #0b1224; border: 1px solid #22304a; border-radius: 12px; padding: 8px; }
-            #StatusLabel { padding: 8px 2px; color: #cbd5e1; }
-            QPushButton { background: #1f2937; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; }
-            QPushButton:hover { background: #273449; }
-            QPushButton:disabled { opacity: 0.5; }
-            QSpinBox { background: #0b1224; border: 1px solid #22304a; border-radius: 10px; padding: 6px; }
+        self.setStyleSheet(f"""
+            * {{ font-family: "{self.font_family}"; }}
+            QMainWindow {{ background: #FEECD0; color: #506b95; font-family: "{self.font_family}"; font-size: 14px;}}
+            #VideoPanel {{ background: #CCD4B1; border-radius: 18px; }}
+            #RightPanel {{ background: #DCA278; border-radius: 18px; padding: 14px; margin-left: 16px; }}
+            #IssuesList {{ background: #0b1224; border: 1px solid #22304a; border-radius: 12px; padding: 8px; }}
+            #StatusLabel {{ padding: 12px 8px; color: #3e5374; }}
+            QPushButton {{ background: #3e5374; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; font-family: "{self.font_family}";}}
+            QPushButton:hover {{ background: #506b95; font-family: "{self.font_family}"; }}
+            QPushButton:disabled {{ opacity: 0.5; font-family: "{self.font_family}"; }}
+            QSpinBox {{ background: #3e5374; border: 1px solid #22304a; border-radius: 6px; padding: 10px; }}
         """)
 
         # Wiring
@@ -348,11 +354,13 @@ class MainWindow(QMainWindow):
     def on_issues(self, issues):
         self.issues_list.clear()
         if not issues:
-            self.issues_list.addItem("No issues detected.")
-
+            self.issues_list.addItem("No issues detected·")
             return
         for issue in issues:
-            self.issues_list.addItem(f"{issue['type']}  |  severity: {issue['severity']:.3f}")
+            item_str = f"{issue['severity']:.3f}"
+            item_str = item_str.split(".")
+            item_str = item_str[0] + "·" + item_str[1]
+            self.issues_list.addItem(f"{issue['type']}  |  severity: {item_str}")
 
     def set_status(self, msg):
         self.status_label.setText(msg)
@@ -392,7 +400,7 @@ class MainWindow(QMainWindow):
         self.base_data = base_data
         self.calib_worker = None
 
-        self.set_status("Calibration complete. Press Start.")
+        self.set_status("Calibration complete· Press Start·")
         self.calibrate_btn.setEnabled(True)
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
@@ -492,16 +500,6 @@ class MainWindow(QMainWindow):
         # Automatically resume posture monitoring
         self.start_posture()
 
-    def stop_posture(self):
-        if self.posture_worker:
-            self.posture_worker.stop()
-            self.posture_worker.wait()
-            self.posture_worker = None
-
-        self.calibrate_btn.setEnabled(True)
-        self.start_btn.setEnabled(self.base_data is not None)
-        self.stop_btn.setEnabled(False)
-
     def on_run_error(self, msg):
         self.set_status(msg)
         self.stop_posture()
@@ -594,6 +592,28 @@ if __name__ == "__main__":
     camera_backend = cv2.CAP_DSHOW
 
     app = QApplication(sys.argv)
-    win = MainWindow(camera_backend=camera_backend)
+
+    # FONTS --------------------------------------------------------------------------
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    font_path = os.path.join(
+        BASE_DIR, "assets", "fonts", "ethereal", "EtherealDemo-SemiBold.otf"
+    )
+
+    font_id = QFontDatabase.addApplicationFont(font_path)
+
+    if font_id == -1:
+        print("Failed to load font")
+        family = "Arial"  # Fallback font
+    else:
+        families = QFontDatabase.applicationFontFamilies(font_id)
+        print("Loaded font families:", families)
+        family = families[0]   # THIS is the real name Qt uses
+        app.setFont(QFont(family, 10))
+
+    # --------------------------------------------------------------------------------
+
+    win = MainWindow(camera_backend=camera_backend, font_family=family)
     win.show()
+    
     sys.exit(app.exec())
