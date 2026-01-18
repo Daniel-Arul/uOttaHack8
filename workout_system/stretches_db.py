@@ -32,12 +32,6 @@ stretches = [
         "instructions": "Sit upright with feet flat. Raise one arm overhead.\n  Gently bend torso toward the opposite side.\n  Keep hips in place, bend only at the waist.\n  Alternate sides, 8 times each direction.",
     },
     {
-        "name": "Spinal Twist",
-        "target": "Torso/Back",
-        "duration": 30,
-        "instructions": "Sit upright in chair. Cross arms over chest or place opposite hand to knee.\n  Rotate torso toward one side, keeping hips forward.\n  Feel the twist through entire spine.\n  Hold and breathe, then alternate sides.",
-    },
-    {
         "name": "Neck Rolls",
         "target": "Neck",
         "reps": 12,
@@ -47,7 +41,7 @@ stretches = [
 
 # Goal to stretches mapping
 goal_to_stretches = {
-    "Back Pain": ["Spinal Twist", "Side Bends"],
+    "Back Pain": ["Reach Behind the Back", "Side Bends"],
     "Posture": ["Chest Opener", "Reach Behind the Back"],
     "Flexibility": ["Arm Crossover Stretch", "Side Bends", "Neck Rolls"],
     "Desk Break": ["Neck Tilts", "Shoulder Rolls", "Wrist Rotations"],
