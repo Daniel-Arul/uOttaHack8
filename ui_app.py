@@ -374,13 +374,13 @@ class MainWindow(QMainWindow):
         self.calib_worker = None
         self.posture_worker = None
         self.workout_worker = None
-        
+
         # Show onboarding if first run
         if is_first_run():
             self.show_onboarding()
 
         # Video preview
-        self.video = QLabel("Camera preview")
+        self.video = QLabel("Click CALIBRATE to begin")
         self.video.setAlignment(Qt.AlignCenter)
         self.video.setMinimumSize(860, 560)
         self.video.setObjectName("VideoPanel")
@@ -390,7 +390,9 @@ class MainWindow(QMainWindow):
         self.issues_list.setObjectName("IssuesList")
 
         # Status line
-        self.status_label = QLabel("Click CALIBRATE to begin· Ensure head and shoulders are in the frame·")
+        self.status_label = QLabel(
+            "Sit upright with a neutral spine, shoulders relaxed, facing the camera with your head and shoulders in view"
+        )
         self.status_label.setObjectName("StatusLabel")
 
         # Controls
@@ -448,18 +450,20 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         # Styling
-        self.setStyleSheet(f"""
+        self.setStyleSheet(
+            f"""
             * {{ font-family: "{self.font_family}"; }}
             QMainWindow {{ background: #FEECD0; color: #506b95; font-family: "{self.font_family}"; font-size: 14px;}}
-            #VideoPanel {{ background: #CCD4B1; border-radius: 18px; }}
+            #VideoPanel {{ background: #CCD4B1; border-radius: 18px; font-size: 24px;}}
             #RightPanel {{ background: #DCA278; border-radius: 18px; padding: 14px; margin-left: 16px; }}
             #IssuesList {{ background: #0b1224; border: 1px solid #22304a; border-radius: 12px; padding: 8px; }}
-            #StatusLabel {{ padding: 12px 8px; color: #3e5374; }}
-            QPushButton {{ background: #3e5374; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; font-family: "{self.font_family}";}}
+            #StatusLabel {{ padding: 12px 8px; color: #3e5374; font-size: 16px;}}
+            QPushButton {{ background: #3e5374; border: 1px solid #334155; padding: 10px 14px; border-radius: 12px; font-family: "{self.font_family}"; font-size: 16px;}}
             QPushButton:hover {{ background: #506b95; font-family: "{self.font_family}"; }}
             QPushButton:disabled {{ opacity: 0.5; font-family: "{self.font_family}"; }}
             QSpinBox {{ background: #3e5374; border: 1px solid #22304a; border-radius: 6px; padding: 10px; }}
-        """)
+        """
+        )
 
         # Wiring
         self.calibrate_btn.clicked.connect(self.start_calibration)
@@ -591,7 +595,7 @@ class MainWindow(QMainWindow):
 
         # Stop posture monitoring
         self.stop_posture()
-        
+
         self.calibrate_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
@@ -722,7 +726,7 @@ class Notification(QObject):
         # Emit signal to trigger workout (safe across threads)
         print(f"[WORKOUT] Emitting start_workout signal with goal: {selected_goal}...")
         self.start_workout_signal.emit(selected_goal)
-    
+
 
 if __name__ == "__main__":
     # Choose backend like your original main.py comments:
