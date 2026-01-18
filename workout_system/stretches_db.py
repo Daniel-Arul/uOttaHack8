@@ -32,5 +32,5 @@ goal_to_stretches = {
     "Back Pain": ["Arm Crossover Stretch", "Side Bends"],
     "Posture": ["Chest Opener", "Reach Behind the Back"],
     "Flexibility": ["Arm Crossover Stretch", "Side Bends", "Neck Rolls"],
-    "Desk Break": ["Neck Tilts", "Shoulder Rolls"],
+    "Desk Break": ["Side Bends", "Shoulder Rolls"],
 }
