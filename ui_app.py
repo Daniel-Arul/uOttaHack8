@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import mediapipe as mp
 
-from PySide6.QtCore import QThread, Signal, Qt
+from PySide6.QtCore import QThread, Signal, Qt, QObject, QCoreApplication
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from main import TIMER_DURATION
 from helpers import extract_pose_data, analyze_posture
 from workout_system.main import main as workout_main
+from workout_system.session import run_interactive_stretch_session_qt
 
 
 # OpenCV to Qt ****************************************************************
@@ -112,14 +113,14 @@ class PostureWorker(QThread):
     status = Signal(str)
     error = Signal(str)
 
-    def __init__(self, base_data, camera_backend, fps=30, camera_index=0):
+    def __init__(self, base_data, camera_backend, main_window, fps=30, camera_index=0):
         super().__init__()
         self.base_data = base_data
         self.camera_backend = camera_backend
         self.fps = fps
         self.camera_index = camera_index
         self._running = False
-        self.notifier = Notification()
+        self.notifier = Notification(main_window)
 
     def stop(self):
         self._running = False
@@ -194,6 +195,56 @@ class PostureWorker(QThread):
         self.status.emit("Stopped.")
 
 
+# Workout Worker (runs in same window) *****************************
+class WorkoutWorker(QThread):
+    frame_ready = Signal(QImage)
+    status = Signal(str)
+    finished = Signal()
+    error = Signal(str)
+
+    def __init__(self, goal, session_time_seconds, camera_backend, fps=30, camera_index=0):
+        super().__init__()
+        self.goal = goal
+        self.session_time_seconds = session_time_seconds
+        self.camera_backend = camera_backend
+        self.fps = fps
+        self.camera_index = camera_index
+        self._stop_requested = False
+
+    def request_stop(self):
+        self._stop_requested = True
+
+    def run(self):
+        def frame_callback(frame_bgr):
+            """Callback to send frames to Qt"""
+            self.frame_ready.emit(bgr_to_qimage(frame_bgr))
+            # Small delay to respect FPS
+            self.msleep(int(1000 / max(1, self.fps)))
+
+        def should_stop_callback():
+            """Callback to check if workout should stop"""
+            return self._stop_requested
+
+        try:
+            self.status.emit(f"Starting {self.goal} workout...")
+            completed = run_interactive_stretch_session_qt(
+                self.goal,
+                self.session_time_seconds,
+                frame_callback,
+                should_stop_callback
+            )
+            
+            if completed:
+                self.status.emit("Workout complete! Great job!")
+            else:
+                self.status.emit("Workout stopped.")
+            
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(f"Workout error: {str(e)}")
+            self.finished.emit()
+
+
 # ---------- Main Window ----------
 class MainWindow(QMainWindow):
     def __init__(self, camera_backend):
@@ -206,6 +257,7 @@ class MainWindow(QMainWindow):
 
         self.calib_worker = None
         self.posture_worker = None
+        self.workout_worker = None
 
         # Video preview
         self.video = QLabel("Camera preview")
@@ -367,6 +419,7 @@ class MainWindow(QMainWindow):
         self.posture_worker = PostureWorker(
             base_data=self.base_data,
             camera_backend=self.camera_backend,
+            main_window=self,
             fps=6,
             camera_index=0
         )
@@ -375,7 +428,69 @@ class MainWindow(QMainWindow):
         self.posture_worker.status.connect(self.set_status)
         self.posture_worker.error.connect(self.on_run_error)
         self.posture_worker.finished.connect(self.on_run_finished)
+        self.posture_worker.notifier = Notification(self)
         self.posture_worker.start()
+
+    def stop_posture(self):
+        if self.posture_worker:
+            self.posture_worker.stop()
+            self.posture_worker.wait()
+            self.posture_worker = None
+
+        self.calibrate_btn.setEnabled(True)
+        self.start_btn.setEnabled(self.base_data is not None)
+        self.stop_btn.setEnabled(False)
+
+    def start_workout(self, goal):
+        """Start a workout in the same window"""
+        print(f"[WORKOUT] start_workout called with goal: {goal}")
+        if self.workout_worker is not None:
+            print("[WORKOUT] Workout already running, ignoring request")
+            return
+
+        # Stop posture monitoring
+        self.stop_posture()
+        
+        self.calibrate_btn.setEnabled(False)
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+
+        self.workout_worker = WorkoutWorker(
+            goal=goal,
+            session_time_seconds=60,  # 1 minute workout
+            camera_backend=self.camera_backend,
+            fps=30,
+            camera_index=0
+        )
+        self.workout_worker.frame_ready.connect(self.on_frame)
+        self.workout_worker.status.connect(self.set_status)
+        self.workout_worker.error.connect(self.on_workout_error)
+        self.workout_worker.finished.connect(self.on_workout_finished)
+        print("[WORKOUT] Starting workout worker...")
+        self.workout_worker.start()
+
+    def trigger_workout_from_notification(self):
+        """Slot to trigger workout from notification thread"""
+        print("[WORKOUT] Triggering workout from notification...")
+        self.start_workout("Back Pain")
+
+    def stop_workout(self):
+        if self.workout_worker:
+            self.workout_worker.request_stop()
+            self.workout_worker.wait()
+            self.workout_worker = None
+
+    def on_workout_error(self, msg):
+        self.set_status(msg)
+        self.stop_workout()
+
+    def on_workout_finished(self):
+        self.workout_worker = None
+        # Reset the notifier's working out flag so timer can work again
+        if self.posture_worker and self.posture_worker.notifier:
+            self.posture_worker.notifier.workingOut = False
+        # Automatically resume posture monitoring
+        self.start_posture()
 
     def stop_posture(self):
         if self.posture_worker:
@@ -407,16 +522,25 @@ class MainWindow(QMainWindow):
             self.posture_worker.stop()
             self.posture_worker.wait()
             self.posture_worker = None
+        if self.workout_worker:
+            self.workout_worker.request_stop()
+            self.workout_worker.wait()
+            self.workout_worker = None
         event.accept()
 
-class Notification():
-    def __init__(self):
+class Notification(QObject):
+    start_workout_signal = Signal(str)  # Signal to trigger workout
+    
+    def __init__(self, main_window):
+        super().__init__()
         self.posture_timer = {
             'start_time': None,
             'notification_sent': False
         }
-
+        self.main_window = main_window
         self.workingOut = False
+        # Connect the signal to the main window's slot
+        self.start_workout_signal.connect(main_window.start_workout)
     
     def decrement_posture_timer(self):
         """
@@ -432,10 +556,13 @@ class Notification():
         if self.posture_timer['start_time'] is None:
             self.posture_timer['start_time'] = time()
             self.posture_timer['notification_sent'] = False
+            print(f"[TIMER] Bad posture detected, timer started")
         else:
             # Check if 30 seconds have elapsed
             elapsed_time = time() - self.posture_timer['start_time']
+            print(f"[TIMER] Elapsed time: {elapsed_time:.1f}s / {TIMER_DURATION}s")
             if elapsed_time >= TIMER_DURATION and not self.posture_timer['notification_sent']:
+                print(f"[TIMER] 30 seconds reached! Triggering workout...")
                 # Send notification in a separate thread to avoid blocking the camera
                 notification_thread = threading.Thread(target=self.send_notification, daemon=True)
                 notification_thread.start()
@@ -448,14 +575,16 @@ class Notification():
     
     def send_notification(self):
         """Send notification in a separate thread to avoid blocking the main camera loop."""
+        print("[WORKOUT] Sending notification and starting workout...")
         plyer.notification.notify(
             title='Bad Posture Alert!',
             message='You have been maintaining bad posture for too long. Please correct it. Shrimp'
         )
 
-        self.workingOut = False
-        workout_main()
         self.workingOut = True
+        # Emit signal to trigger workout (safe across threads)
+        print("[WORKOUT] Emitting start_workout signal...")
+        self.start_workout_signal.emit("Back Pain")
     
 
 if __name__ == "__main__":
